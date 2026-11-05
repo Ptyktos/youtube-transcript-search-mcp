@@ -57,7 +57,7 @@ impl RpcResponse {
 // ── CORS helpers ──────────────────────────────────────────────────────────────
 
 fn cors_headers() -> Headers {
-    let mut h = Headers::new();
+    let h = Headers::new();
     // These are static strings that will never fail to set.
     h.set("Access-Control-Allow-Origin", "*")
         .expect("valid header name");
@@ -144,7 +144,7 @@ fn sse_response(body: &impl Serialize) -> Result<Response> {
 // ── HTTP fetch using worker-rs ─────────────────────────────────────────────────
 
 async fn fetch_text(url: &str) -> std::result::Result<String, TranscriptError> {
-    let mut headers = Headers::new();
+    let headers = Headers::new();
     headers
         .set("User-Agent", USER_AGENT)
         .map_err(|e| TranscriptError::Network(e.to_string()))?;
@@ -180,7 +180,7 @@ async fn fetch_innertube(
     let body_str =
         serde_json::to_string(&body).map_err(|e| TranscriptError::Parse(e.to_string()))?;
 
-    let mut headers = Headers::new();
+    let headers = Headers::new();
     headers
         .set("Content-Type", "application/json")
         .map_err(|e| TranscriptError::Network(e.to_string()))?;
