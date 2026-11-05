@@ -3,6 +3,7 @@ name = "youtube-transcript-mcp-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "Core logic for YouTube Transcript MCP (no I/O)"
 
 [lints]

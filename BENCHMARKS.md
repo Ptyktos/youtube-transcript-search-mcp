@@ -123,8 +123,8 @@ so for plain text **there is no context-size advantage** over the others. The
 - The old anaisbetts rows measured a silent failure: a malformed fixture made
   its VTT parser return an empty transcript. That is fixed, and the harness
   now fails any empty or `isError` response.
-- The old "~270× faster than yt-dlp servers" headline compared against
-  spinalshock's deliberate 1.5–3 s sleep. The yt-dlp cost alone is about 3×.
+- The old headline speed-up claim compared against spinalshock's deliberate
+  1.5–3 s sleep and has been withdrawn. The yt-dlp cost alone is about 3×.
 - The binary is 4.9 MiB, not 3.3 MiB.
 - The XML parser now builds timestamped segments for the output formats, so it
   runs at 207 MiB/s rather than the old 409 MiB/s. It is still about 8–9×

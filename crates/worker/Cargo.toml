@@ -3,6 +3,7 @@ name = "youtube-transcript-mcp-worker"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+repository = "https://github.com/webfold-ai/youtube-transcript-mcp"
 description = "YouTube Transcript MCP server — Cloudflare Workers"
 
 # Standalone workspace so wrangler can build with wasm32-unknown-unknown
