@@ -13,7 +13,7 @@ path = "src/main.rs"
 workspace = true
 
 [dependencies]
-youtube-transcript-mcp-core = { path = "../core" }
+youtube-transcript-mcp-core = { path = "../core", version = "0.1.0" }
 rmcp = { version = "3.4", features = ["server", "transport-io"] }
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "multipart", "json", "stream"] }
