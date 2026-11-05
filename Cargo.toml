@@ -7,6 +7,7 @@ members = ["crates/core", "crates/native"]
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+repository = "https://github.com/webfold-ai/youtube-transcript-mcp"
 
 [profile.release]
 opt-level = "z"

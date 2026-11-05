@@ -10,7 +10,7 @@ reporter.
 
 Once GitHub private vulnerability reporting is enabled in repository settings,
 reports can also be submitted through
-[GitHub Security Advisories](https://github.com/Ptyktos/youtube-transcript-search/security/advisories/new).
+[GitHub Security Advisories](https://github.com/webfold-ai/youtube-transcript-mcp/security/advisories/new).
 
 ## Supported versions
 

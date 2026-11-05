@@ -3,29 +3,33 @@
 
   # YouTube Transcript MCP Server
 
-  A Model Context Protocol (MCP) server that extracts transcripts from YouTube
-  videos. Written in Rust. Runs as a native binary or as a Cloudflare Worker
-  (via WebAssembly) — same logic, two deployment targets.
+  Retrieve YouTube transcripts through MCP, HTTP or a CLI. Run the Rust server
+  locally or deploy the Cloudflare Worker target. Select a language and return
+  text, JSON, Markdown, SRT or VTT. The native server can optionally transcribe
+  audio when captions are unavailable; that fallback requires an external
+  transcription service.
 </div>
 
-![youtube-transcript-search artwork](assets/social-card.png)
+![YouTube Transcript MCP artwork](assets/social-card.png)
 
 ## Features
 
 - **Single tool**: `get_transcript(url, language?, format?)` — works with any
   YouTube URL format.
 - **Three ways to call it**:
-  - **MCP** over stdio (native) or JSON-RPC over HTTP / SSE (native + Worker)
+  - **MCP** over stdio (native), or stateless JSON-RPC over HTTP / SSE
+    (native + Worker; `initialize`, `tools/list` and `tools/call` only)
   - **Raw HTTP**: `GET /transcript?url=…&language=…` returns plain text — curl-friendly
   - **CLI one-shot**: `youtube-transcript-mcp --url <URL>` prints to stdout and exits
 - **Native binary**: stdio transport for Claude Desktop / local clients, plus
   an HTTP server with `/transcript`, `/mcp`, and `/sse`.
 - **WASM Worker**: same Rust code, deployed to Cloudflare Workers. Exposes the
   same `/transcript`, `/mcp`, `/sse` endpoints.
-- **Whisper fallback** (native only): when a video has no captions and
-  `WHISPER_URL` is set, the server downloads the audio stream and transcribes
-  it via a [faster-whisper-server](https://github.com/fedirz/faster-whisper-server)
-  compatible endpoint.
+- **Transcription fallback** (native only, optional): when a video has no
+  caption tracks and `WHISPER_URL` is set, the server downloads the audio
+  stream and sends it to an external
+  [faster-whisper-server](https://github.com/fedirz/faster-whisper-server)
+  compatible endpoint. Not available in the Worker.
 - **URL flexibility**: `watch?v=`, `youtu.be/`, `/shorts/`, `/live/`, `/embed/`,
   international domains (`youtube.co.uk`, `youtube.de`, …), with or without scheme.
 - **Language selection**: BCP-47 codes (`en`, `es`, `fr`, …) or `auto` (default).
@@ -37,6 +41,9 @@
   video; `srt`/`vtt` are standard subtitle files.
 
 ## Repository layout
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the request path, state,
+error handling and the native vs Worker differences.
 
 ```
 crates/
@@ -65,21 +72,27 @@ it for `wasm32-unknown-unknown` without affecting the host workspace.
 
 Measured against a local YouTube mock (80 KiB caption track, 80 ms added per
 response), with the same MCP client for every server and competitors at pinned
-versions. Results are about 3× faster than yt-dlp-based servers and on par
-with nabid-pf on latency, with the lowest memory of any server tested. Setup,
-loopback numbers, parser numbers, what isn't claimed, and how to reproduce:
-[BENCHMARKS.md](BENCHMARKS.md).
+versions. The yt-dlp-based servers ran against a `yt-dlp` stub that sleeps for
+a measured start-up cost, so their rows are simulated, not real yt-dlp against
+real YouTube. Under this setup this repo is about 3× faster than the tested
+yt-dlp-based servers, has similar latency to the direct-Innertube Node server
+(nabid-pf), and used the least memory of the servers tested. This is not a
+real-YouTube latency claim. Setup, loopback numbers, parser numbers, what isn't
+claimed, and how to reproduce: [BENCHMARKS.md](BENCHMARKS.md).
 
 ## Self-hosting (native binary)
 
 ### From source
 
 ```bash
-git clone https://github.com/twn-systems/youtube-transcript-mcp-rust
-cd youtube-transcript-mcp-rust
+git clone https://github.com/webfold-ai/youtube-transcript-mcp
+cd youtube-transcript-mcp
 cargo build --release -p youtube-transcript-mcp
 # binary at target/release/youtube-transcript-mcp
 ```
+
+Quick check without network access to YouTube: see
+[Smoke test](#smoke-test).
 
 ### Run
 
@@ -104,7 +117,7 @@ HTTP endpoints:
 |--------|------------------------------------------|-----------------------------------------------------------|
 | GET    | `/`                                      | Server info JSON                                          |
 | GET    | `/transcript?url=…&language=…&format=…`  | Transcript in the requested `format` (defaults to `text`) |
-| POST   | `/mcp`                                   | MCP JSON-RPC (Streamable HTTP)                            |
+| POST   | `/mcp`                                   | Stateless MCP JSON-RPC over HTTP (single request/response) |
 | GET    | `/sse`                                   | SSE handshake                                             |
 | POST   | `/sse`                                   | MCP JSON-RPC over SSE (single-shot)                       |
 
@@ -129,11 +142,13 @@ Add to `claude_desktop_config.json`:
 }
 ```
 
-### Whisper fallback (optional)
+### Transcription fallback (optional, external service required)
 
-When a video has no captions, the native server can fall back to ASR.
-Point it at any OpenAI-compatible `/v1/audio/transcriptions` endpoint (for
-example, [faster-whisper-server](https://github.com/fedirz/faster-whisper-server)):
+When a video has no caption tracks, the native server can fall back to ASR,
+but only if `WHISPER_URL` points at a transcription service you run. The
+server posts to `<WHISPER_URL>/v1/audio/transcriptions` (OpenAI-style, with
+model `small`), for example
+[faster-whisper-server](https://github.com/fedirz/faster-whisper-server):
 
 ```bash
 WHISPER_URL=http://localhost:8000 ./target/release/youtube-transcript-mcp --stdio
@@ -169,8 +184,11 @@ The Worker exposes the same endpoints as the native HTTP server:
 
 - `GET /` — server info JSON
 - `GET /transcript?url=…&language=…&format=…` — transcript in the requested `format`
-- `POST /mcp` — MCP JSON-RPC (Streamable HTTP)
+- `POST /mcp` — stateless MCP JSON-RPC over HTTP
 - `GET /sse` / `POST /sse` — MCP JSON-RPC over Server-Sent Events
+
+The Worker has no transcription fallback, and it also accepts `lang` and `fmt`
+as aliases for `language` and `format`.
 
 ```bash
 curl 'https://your-worker.workers.dev/transcript?url=https://youtu.be/dQw4w9WgXcQ'
@@ -231,12 +249,38 @@ curl -X POST https://your-worker.workers.dev/mcp \
 
 Tracking parameters (`si`, `t`, …) are ignored.
 
+## Smoke test
+
+The repo ships a mock YouTube server (`bench/mock/server.py`) and the native
+binary can be pointed at it with `YTMCP_INNERTUBE_URL`, so no real YouTube
+request is needed:
+
+```bash
+python3 bench/mock/server.py 18080 &     # serves the fixtures in bench/canned/
+YTMCP_INNERTUBE_URL=http://127.0.0.1:18080/youtubei/v1/player \
+  ./target/release/youtube-transcript-mcp \
+  --url 'https://youtu.be/dQw4w9WgXcQ' --format markdown
+```
+
+Expected output shape: one Markdown list item per cue, each with a clock
+label linking to `watch?v=<id>&t=<secs>s` (the text is the fixture's filler
+words, not a real video):
+
+```
+- [0:00](https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=0s) the dog lazy lazy jumps
+- [0:02](https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=2s) brown while forest quick the brown the lazy bright singing the moon
+...
+```
+
+An invalid URL (for example `--url https://example.com/x`) exits with status 1
+and `Invalid YouTube URL` on stderr. Stop the mock with `kill %1`.
+
 ## Development
 
 ```bash
 cargo fmt --check
 cargo clippy --workspace -- -D warnings
-cargo test --workspace          # core unit tests + native HTTP integration tests (wiremock)
+cargo test --workspace          # core unit tests + native pipeline tests (wiremock)
 
 # Parser microbenchmark (Criterion) — see BENCHMARKS.md
 cargo bench -p youtube-transcript-mcp-core --bench parser
