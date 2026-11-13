@@ -2,7 +2,7 @@
 
 ## Report a vulnerability
 
-Email **security@ptyktos.com** to report a suspected vulnerability. Do not open a
+Email **security@webfold.ai** to report a suspected vulnerability. Do not open a
 public issue for an unpatched vulnerability. Include the affected version or
 commit, impact, and steps to reproduce. The maintainers will acknowledge
 reports as soon as practical and coordinate a fix and disclosure with the
